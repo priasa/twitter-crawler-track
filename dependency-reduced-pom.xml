@@ -52,8 +52,12 @@
     </plugins>
   </build>
   <properties>
+    <mysql-connector-version>5.1.31</mysql-connector-version>
     <activemq.version>5.10.0</activemq.version>
     <spring.version>3.2.9.RELEASE</spring.version>
+    <spring-data-jpa>1.6.1.RELEASE</spring-data-jpa>
+    <commons-dbcp-version>1.4</commons-dbcp-version>
+    <spring-data-mongodb>1.5.2.RELEASE</spring-data-mongodb>
   </properties>
 </project>
 

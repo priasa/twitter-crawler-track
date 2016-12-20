@@ -1,25 +1,29 @@
 package id.smarta.krakatau.streamer.twitter;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-
-import javax.jms.JMSException;
-import javax.jms.Message;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jms.core.JmsTemplate;
-import org.springframework.jms.core.MessagePostProcessor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import com.google.gson.Gson;
+
+import id.smarta.krakatau.streamer.dao.KrakatauRepository;
+import id.smarta.krakatau.streamer.dao.TwitterRepository;
+import id.smarta.krakatau.streamer.entity.TwitterRaw;
+import id.smarta.krakatau.streamer.entity.TwitterStatus;
 import id.smarta.krakatau.streamer.util.TwitterStreamBuilderUtil;
 import twitter4j.FilterQuery;
+import twitter4j.HashtagEntity;
 import twitter4j.StallWarning;
 import twitter4j.Status;
 import twitter4j.StatusDeletionNotice;
 import twitter4j.StatusListener;
 import twitter4j.TwitterStream;
+import twitter4j.URLEntity;
+import twitter4j.UserMentionEntity;
 
 /**
  * 
@@ -30,10 +34,14 @@ public class TwitterReader {
 
 	static final Logger LOGGER = LoggerFactory.getLogger(TwitterReader.class);
 
+	private static final String TWITTER_TRACK_001 = "TWITTER_TRACK_001";
+
 	private JmsTemplate twitterJmsTemplate;
 	private TwitterStream stream;
 	private ThreadPoolTaskExecutor taskExecutor;
-
+	private KrakatauRepository krakatauRepository;
+	private TwitterRepository twitterRepository;
+	
 	public String readTwitterFeed() {
 		StatusListener listener = new StatusListener() {
 			public void onException(Exception e) {
@@ -45,37 +53,36 @@ public class TwitterReader {
 				LOGGER.warn("Track limitation notice for " + n);
 			}
 
-			public void onStatus(Status status) {
-				final String tweetId = ""+status.getId();
-				final String tweetStatus = generateTweetStatus(status, false);	
+			public void onStatus(final Status status) {
+				String tweetStatus = generateTweetStatus(status, false);
 				LOGGER.info(tweetStatus);
-				
-				//send status to queue
 				taskExecutor.execute(new Runnable() {
 					public void run() {
-						twitterJmsTemplate.convertAndSend("twitterTrack1", tweetStatus, new MessagePostProcessor() {
-							public Message postProcessMessage(Message message) throws JMSException {
-								message.setJMSCorrelationID(tweetId);
-								message.setJMSTimestamp(new Date().getTime());
-								return message;
-							}
-						});
+						doSaveTwitterRaw(status);
+					}
+				});
+				
+				taskExecutor.execute(new Runnable() {
+					public void run() {
+						TwitterStatus twitterStatus  = extractTwitterStatus(status);
+						twitterRepository.saveStatus(twitterStatus);
 					}
 				});
 				
 				if (status.getRetweetedStatus() != null) {
-					final String retweetStatus = generateTweetStatus(status.getRetweetedStatus(), true);
-					
-					//send retweetstatus to queue
 					taskExecutor.execute(new Runnable() {
 						public void run() {
-							twitterJmsTemplate.convertAndSend("twitterTrack2", retweetStatus, new MessagePostProcessor() {
-								public Message postProcessMessage(Message message) throws JMSException {
-									message.setJMSCorrelationID(tweetId);
-									message.setJMSTimestamp(new Date().getTime());
-									return message;
-								}
-							});
+							TwitterStatus twitterStatus  = extractTwitterStatus(status.getRetweetedStatus());
+							twitterRepository.saveRetweet(twitterStatus);
+						}
+					});
+				}
+				
+				if (status.getQuotedStatus() != null) {
+					taskExecutor.execute(new Runnable() {
+						public void run() {
+							TwitterStatus twitterStatus  = extractTwitterStatus(status.getQuotedStatus());
+							twitterRepository.saveQuote(twitterStatus);
 						}
 					});
 				}
@@ -93,25 +100,18 @@ public class TwitterReader {
 				LOGGER.info("Status deletion notice");
 			}
 		};
-		
+
+
 		if (stream != null) {
 			LOGGER.info("###STREAM NOT NULL");
 			stream.shutdown();
 		} 
-		
+
 		stream = TwitterStreamBuilderUtil.getStream();
 		stream.addListener(listener);
 		LOGGER.info("###STREAM AVAILABLE");
 				
-		List<String> tracks = new ArrayList<String>(); 
-		tracks.add("bekraf");
-		tracks.add("bekup2.0");
-		tracks.add("bekup 2.0");
-		tracks.add("bekraf for startup");
-		tracks.add("bekraf developer day");
-		tracks.add("kominfo");
-		tracks.add("kemkominfo");
-		tracks.add("Kementerian Kominfo");
+		List<String> tracks = krakatauRepository.findTwitterKeywords(TWITTER_TRACK_001); 
 		
 		String[] keywords = tracks.toArray(new String[tracks.size()]);
 		
@@ -125,7 +125,62 @@ public class TwitterReader {
 		qry.track(keywords);
 		stream.filter(qry);
 		
-		return "READ_TWITTER_FEED";
+		return "TWITTER_STREAM";
+	}
+
+	protected TwitterStatus extractTwitterStatus(Status status) {
+		TwitterStatus twitterStatus = new TwitterStatus();
+		twitterStatus.setCreatedAt(status.getCreatedAt());
+		twitterStatus.setFavorited(status.isFavorited());
+		twitterStatus.setFavoritedCount(status.getFavoriteCount());
+		twitterStatus.setKeywordGroup(TWITTER_TRACK_001);
+
+		List<String> hashTags = new ArrayList<String>();
+		HashtagEntity[] hashtagEntities = status.getHashtagEntities();
+		for (HashtagEntity hashtagEntity : hashtagEntities) {
+			hashTags.add(hashtagEntity.getText());
+		}
+		twitterStatus.setHashTags(hashTags);
+		
+		List<String> mentions = new ArrayList<String>();
+		UserMentionEntity[] userMentionEntities =  status.getUserMentionEntities();
+		for (UserMentionEntity userMentionEntity : userMentionEntities) {
+			mentions.add(userMentionEntity.getName());
+		}
+		twitterStatus.setMentions(mentions);
+		
+		if (status.getRetweetedStatus() != null) {
+			twitterStatus.setOriginId(status.getRetweetedStatus().getId()); 
+		}
+		
+		List<String> twitterUrls = new ArrayList<String>(); 
+		URLEntity[] urlEntities =  status.getURLEntities();
+		for (URLEntity urlEntity : urlEntities) {
+			twitterUrls.add(urlEntity.getExpandedURL());
+		}
+		twitterStatus.setTwitterUrls(twitterUrls);
+		
+		twitterStatus.setQuotedStatusId(status.getQuotedStatusId());
+		twitterStatus.setReplyToScreenName(status.getInReplyToScreenName());
+		twitterStatus.setReplyToStatusId(status.getInReplyToStatusId());
+		twitterStatus.setReplyToUserId(status.getInReplyToUserId());
+		twitterStatus.setRetweet(status.isRetweet());
+		twitterStatus.setRetweeted(status.isRetweeted());
+		twitterStatus.setSource(status.getSource());
+		twitterStatus.setText(status.getText());
+		twitterStatus.setTweetId(status.getId());
+		twitterStatus.setUserId(status.getUser().getId());
+		twitterStatus.setUserScreenName(status.getUser().getScreenName());
+		return twitterStatus;
+	}
+
+	protected void doSaveTwitterRaw(Status status) {
+		String twitterRaw  = new Gson().toJson(status);
+		TwitterRaw raw = new TwitterRaw();
+		raw.setContent(twitterRaw);
+		raw.setTweetId(status.getId());
+		raw.setKeywordGroup(TWITTER_TRACK_001);
+		twitterRepository.saveRaw(raw);
 	}
 
 	private String generateTweetStatus(Status status, boolean isRetweet) {
@@ -145,7 +200,7 @@ public class TwitterReader {
 		tweetStatus.append(status.isRetweeted()).append(",");
 		tweetStatus.append(status.getUser().getId()).append(",");
 		tweetStatus.append(status.getUser().getScreenName());
-		
+	
 		if (!isRetweet) {
 			String originalId = "null";
 			if (status.getRetweetedStatus() != null) {
@@ -181,5 +236,28 @@ public class TwitterReader {
 		this.stream = stream;
 	}
 
+	public void shutdownStream() {
+		if (stream != null) {
+			LOGGER.info("###READY TO SHUTDOWN");
+			stream.shutdown();
+		}
+	}
+
+	public KrakatauRepository getKrakatauRepository() {
+		return krakatauRepository;
+	}
+
+	public void setKrakatauRepository(KrakatauRepository krakatauRepository) {
+		this.krakatauRepository = krakatauRepository;
+	}
+
+	public TwitterRepository getTwitterRepository() {
+		return twitterRepository;
+	}
+
+	public void setTwitterRepository(TwitterRepository twitterRepository) {
+		this.twitterRepository = twitterRepository;
+	}
+	
 	
 }

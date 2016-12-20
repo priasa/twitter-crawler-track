@@ -8,6 +8,10 @@
 	<properties>
 		<spring.version>3.2.9.RELEASE</spring.version>
 		<activemq.version>5.10.0</activemq.version>
+		<commons-dbcp-version>1.4</commons-dbcp-version>
+		<spring-data-jpa>1.6.1.RELEASE</spring-data-jpa>
+		<mysql-connector-version>5.1.31</mysql-connector-version>
+		<spring-data-mongodb>1.5.2.RELEASE</spring-data-mongodb>	
 	</properties>
 
 	<dependencies>
@@ -15,6 +19,11 @@
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
 			<version>2.5</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-dbcp</groupId>
+			<artifactId>commons-dbcp</artifactId>
+			<version>${commons-dbcp-version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.twitter4j</groupId>
@@ -45,6 +54,22 @@
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-jms</artifactId>
 			<version>${spring.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jdbc</artifactId>
+			<version>${spring.version}</version>
+		</dependency>
+		<!-- Spring data mongodb -->
+        <dependency>
+        	<groupId>org.springframework.data</groupId>
+        	<artifactId>spring-data-mongodb</artifactId>
+        	<version>${spring-data-mongodb}</version>
+        </dependency>
+		<dependency>
+			<groupId>mysql</groupId>
+			<artifactId>mysql-connector-java</artifactId>
+			<version>${mysql-connector-version}</version>
 		</dependency>
 		<!-- ActiveMQ -->
 		<dependency>
