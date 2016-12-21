@@ -20,40 +20,19 @@
        	http://www.springframework.org/schema/data/mongo
     	http://www.springframework.org/schema/data/mongo/spring-mongo-1.0.xsd">
 
-	
-	<bean id="cachedConnectionFactory" class="org.springframework.jms.connection.CachingConnectionFactory">
-		<property name="targetConnectionFactory" ref="amqConnectionFactory" />
-		<property name="sessionCacheSize" value="30" />
-	</bean>
-	
-	<bean id="amqConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
-        <!--<property name="brokerURL" value="tcp://smarta:61616" />-->
-		<property name="brokerURL" value="tcp://localhost:61616" />
-		<property name="userName" value="smx"/>
-		<property name="password" value="smx"/>
-	</bean>
+	<context:property-placeholder location="classpath*:context/configuration.properties" />
 	
 	<bean id="twitterService" class="id.smarta.krakatau.streamer.twitter.TwitterServiceImpl">
 		<property name="krakatauRepository" ref="krakatauRepository" />
 		<property name="twitterReader" ref="twitterReader"/>
+		<property name="streamTrackId" value="${twitter.stream.track.id}"></property>
 	</bean>
 
 	<bean id="twitterReader" class="id.smarta.krakatau.streamer.twitter.TwitterReader">
-		<property name="twitterJmsTemplate" ref="twitterJmsTemplate"/>
 		<property name="taskExecutor" ref="taskExecutor" />
 		<property name="krakatauRepository" ref="krakatauRepository" />
 		<property name="twitterRepository" ref="twitterRepository"/>
-	</bean>
-	
-	<bean id="twitterJmsTemplate" class="org.springframework.jms.core.JmsTemplate">
-		<property name="connectionFactory" ref="cachedConnectionFactory"/>
-		<property name="defaultDestination" ref="twitterRouterStep1Queue" />
-		<property name="receiveTimeout" value="30000"/>
-        <property name="timeToLive" value="30000"/> 
-	</bean>
-	
-	<bean id="twitterRouterStep1Queue" class="org.apache.activemq.command.ActiveMQQueue">
-		<constructor-arg value="twitterTrack1" />
+		<property name="keywordGroup" value="${twitter.keyword.group}"/>
 	</bean>
 	
 	<bean id="taskExecutor"
@@ -65,10 +44,10 @@
 	</bean>
 	
 	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
-		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="driverClassName" value="${jdbc.driver.className}" />
 		<property name="url" value="jdbc:mysql://localhost:3306/five?characterEncoding=UTF-8" />
-		<property name="username" value="root" />
-		<property name="password" value="3nengtri" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
 		<property name="removeAbandoned" value="true"/>
 	   	<property name="initialSize" value="5" />
 	   	<property name="maxActive" value="20" />

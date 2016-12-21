@@ -13,26 +13,14 @@ import id.smarta.krakatau.streamer.entity.TwitterStatus;
  */
 public class TwitterRepository {
 
-	private static final String TWITTER_RETWEET = "TWITTER_RETWEET";
-	private static final String TWITTER_STATUS = "TWITTER_STATUS";
-	private static final String TWITTER_QUOTE = "TWITTER_QUOTE";
-	
 	@Autowired
 	private MongoTemplate mongoTemplate;
     
-    public void saveStatus(TwitterStatus entity) {
-		mongoTemplate.save(entity, TWITTER_STATUS);
+    public void saveStatus(TwitterStatus entity, String collectionName) {
+		mongoTemplate.save(entity, collectionName);
 	}
 	
-    public void saveRetweet(TwitterStatus entity) {
-		mongoTemplate.save(entity, TWITTER_RETWEET);
-	}
-	
-    public void saveQuote(TwitterStatus entity) {
-		mongoTemplate.save(entity, TWITTER_QUOTE);
-	}
-
-    public void saveRaw(TwitterRaw entity) {
+    public void saveRaw(TwitterRaw entity, String collectionName) {
 		mongoTemplate.save(entity);
 	}
     

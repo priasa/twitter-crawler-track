@@ -50,11 +50,7 @@
 			<artifactId>spring-context-support</artifactId>
 			<version>${spring.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-jms</artifactId>
-			<version>${spring.version}</version>
-		</dependency>
+		
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-jdbc</artifactId>
@@ -71,7 +67,12 @@
 			<artifactId>mysql-connector-java</artifactId>
 			<version>${mysql-connector-version}</version>
 		</dependency>
-		<!-- ActiveMQ -->
+		<!-- ActiveMQ
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jms</artifactId>
+			<version>${spring.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.apache.activemq</groupId>
 			<artifactId>activemq-spring</artifactId>
@@ -83,7 +84,7 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-
+ 		-->
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>

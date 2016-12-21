@@ -5,14 +5,10 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jms.core.JmsTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-
-import com.google.gson.Gson;
 
 import id.smarta.krakatau.streamer.dao.KrakatauRepository;
 import id.smarta.krakatau.streamer.dao.TwitterRepository;
-import id.smarta.krakatau.streamer.entity.TwitterRaw;
 import id.smarta.krakatau.streamer.entity.TwitterStatus;
 import id.smarta.krakatau.streamer.util.TwitterStreamBuilderUtil;
 import twitter4j.FilterQuery;
@@ -34,15 +30,13 @@ public class TwitterReader {
 
 	static final Logger LOGGER = LoggerFactory.getLogger(TwitterReader.class);
 
-	private static final String TWITTER_TRACK_001 = "TWITTER_TRACK_001";
-
-	private JmsTemplate twitterJmsTemplate;
+	private String keywordGroup;
 	private TwitterStream stream;
 	private ThreadPoolTaskExecutor taskExecutor;
 	private KrakatauRepository krakatauRepository;
 	private TwitterRepository twitterRepository;
 	
-	public String readTwitterFeed() {
+	public String readTwitterFeed(final String collectionName) {
 		StatusListener listener = new StatusListener() {
 			public void onException(Exception e) {
 				LOGGER.error("Exception occured:" + e.getMessage());
@@ -55,17 +49,11 @@ public class TwitterReader {
 
 			public void onStatus(final Status status) {
 				String tweetStatus = generateTweetStatus(status, false);
-				LOGGER.info(tweetStatus);
-				taskExecutor.execute(new Runnable() {
-					public void run() {
-						doSaveTwitterRaw(status);
-					}
-				});
-				
+				LOGGER.info(tweetStatus);		
 				taskExecutor.execute(new Runnable() {
 					public void run() {
 						TwitterStatus twitterStatus  = extractTwitterStatus(status);
-						twitterRepository.saveStatus(twitterStatus);
+						twitterRepository.saveStatus(twitterStatus, collectionName.concat("_SA"));
 					}
 				});
 				
@@ -73,7 +61,7 @@ public class TwitterReader {
 					taskExecutor.execute(new Runnable() {
 						public void run() {
 							TwitterStatus twitterStatus  = extractTwitterStatus(status.getRetweetedStatus());
-							twitterRepository.saveRetweet(twitterStatus);
+							twitterRepository.saveStatus(twitterStatus, collectionName.concat("_RE"));
 						}
 					});
 				}
@@ -82,7 +70,7 @@ public class TwitterReader {
 					taskExecutor.execute(new Runnable() {
 						public void run() {
 							TwitterStatus twitterStatus  = extractTwitterStatus(status.getQuotedStatus());
-							twitterRepository.saveQuote(twitterStatus);
+							twitterRepository.saveStatus(twitterStatus, collectionName.concat("_QU"));
 						}
 					});
 				}
@@ -111,7 +99,7 @@ public class TwitterReader {
 		stream.addListener(listener);
 		LOGGER.info("###STREAM AVAILABLE");
 				
-		List<String> tracks = krakatauRepository.findTwitterKeywords(TWITTER_TRACK_001); 
+		List<String> tracks = krakatauRepository.findTwitterKeywords(keywordGroup); 
 		
 		String[] keywords = tracks.toArray(new String[tracks.size()]);
 		
@@ -133,7 +121,7 @@ public class TwitterReader {
 		twitterStatus.setCreatedAt(status.getCreatedAt());
 		twitterStatus.setFavorited(status.isFavorited());
 		twitterStatus.setFavoritedCount(status.getFavoriteCount());
-		twitterStatus.setKeywordGroup(TWITTER_TRACK_001);
+		twitterStatus.setKeywordGroup(keywordGroup);
 
 		List<String> hashTags = new ArrayList<String>();
 		HashtagEntity[] hashtagEntities = status.getHashtagEntities();
@@ -174,14 +162,14 @@ public class TwitterReader {
 		return twitterStatus;
 	}
 
-	protected void doSaveTwitterRaw(Status status) {
-		String twitterRaw  = new Gson().toJson(status);
-		TwitterRaw raw = new TwitterRaw();
-		raw.setContent(twitterRaw);
-		raw.setTweetId(status.getId());
-		raw.setKeywordGroup(TWITTER_TRACK_001);
-		twitterRepository.saveRaw(raw);
-	}
+//	protected void doSaveTwitterRaw(Status status, String collectionName) {
+//		String twitterRaw  = new Gson().toJson(status);
+//		TwitterRaw raw = new TwitterRaw();
+//		raw.setContent(twitterRaw);
+//		raw.setTweetId(status.getId());
+//		raw.setKeywordGroup(KEYWORD_GROUP);
+//		twitterRepository.saveRaw(raw, collectionName);
+//	}
 
 	private String generateTweetStatus(Status status, boolean isRetweet) {
 		StringBuilder tweetStatus = new StringBuilder();
@@ -220,14 +208,6 @@ public class TwitterReader {
 		this.taskExecutor = taskExecutor;
 	}
 
-	public JmsTemplate getTwitterJmsTemplate() {
-		return twitterJmsTemplate;
-	}
-
-	public void setTwitterJmsTemplate(JmsTemplate twitterJmsTemplate) {
-		this.twitterJmsTemplate = twitterJmsTemplate;
-	}
-
 	public TwitterStream getStream() {
 		return stream;
 	}
@@ -258,6 +238,13 @@ public class TwitterReader {
 	public void setTwitterRepository(TwitterRepository twitterRepository) {
 		this.twitterRepository = twitterRepository;
 	}
-	
+
+	public String getKeywordGroup() {
+		return keywordGroup;
+	}
+
+	public void setKeywordGroup(String keywordGroup) {
+		this.keywordGroup = keywordGroup;
+	}
 	
 }

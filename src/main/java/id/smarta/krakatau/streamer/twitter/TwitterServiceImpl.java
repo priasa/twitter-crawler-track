@@ -16,22 +16,19 @@ public class TwitterServiceImpl implements TwitterService {
 
 	static final Logger LOGGER = LoggerFactory.getLogger(TwitterServiceImpl.class);
 
-	private static final String STREAM_TRACK_ID = "STREAM_TRACK_01";
 	private static final String NEED_TO_RESTART = "NEED_TO_RESTART";
-	private static final String RUNNING = "RUNNING";
 
 	TwitterReader twitterReader;
 	KrakatauRepository krakatauRepository;
-
+	String streamTrackId; 
+	
 	@Override
 	public void doStream() throws InterruptedException {
 		String twitterId = null;
 		while (true) {
 			if (twitterId == null) {
-				twitterReader.readTwitterFeed();
+				twitterReader.readTwitterFeed(streamTrackId);
 				twitterId = UUID.randomUUID().toString();
-				krakatauRepository.updateTwitterStreamStatus(STREAM_TRACK_ID);
-				LOGGER.info("###UPDATE STREAM STATUS :["+RUNNING+"]");
 			}
 			Thread.sleep(300000);
 			LOGGER.info("###CHECK STREAM STATUS");
@@ -41,7 +38,7 @@ public class TwitterServiceImpl implements TwitterService {
 	}
 
 	private String checkStreamStatus(String twitterId) {
-		String streamStatus = krakatauRepository.findTwitterStreamStatus(STREAM_TRACK_ID);
+		String streamStatus = krakatauRepository.findTwitterStreamStatus(streamTrackId);
 		LOGGER.info("###STREAM STATUS :[" + streamStatus + "]");
 		if (streamStatus != null) {
 			if (streamStatus.equalsIgnoreCase(NEED_TO_RESTART)) {
@@ -66,6 +63,14 @@ public class TwitterServiceImpl implements TwitterService {
 
 	public void setKrakatauRepository(KrakatauRepository krakatauRepository) {
 		this.krakatauRepository = krakatauRepository;
+	}
+
+	public String getStreamTrackId() {
+		return streamTrackId;
+	}
+
+	public void setStreamTrackId(String streamTrackId) {
+		this.streamTrackId = streamTrackId;
 	}
 
 }
